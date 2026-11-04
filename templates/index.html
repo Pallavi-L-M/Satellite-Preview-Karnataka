@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satellite Preview Karnataka | Flood Prediction & Early Warning</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--card-hover:#334155;--border:#475569;--accent:#3b82f6;--text:#f1f5f9;--text2:#94a3b8;--severe:#dc2626;--high:#ea580c;--moderate:#eab308;--low:#22c55e;--minimal:#3b82f6}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* Header */
+.header{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1000}
+.header-title{display:flex;align-items:center;gap:12px}
+.header-title i{font-size:28px;color:var(--accent)}
+.header-title h1{font-size:20px;font-weight:700}
+.header-title span{font-size:12px;color:var(--text2);display:block}
+.header-badge{background:var(--accent);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
+/* Tabs */
+.tab-bar{display:flex;background:#1a2332;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{padding:12px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:13px;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.tab-btn:hover{color:var(--text);background:rgba(59,130,246,.1)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(59,130,246,.05)}
+.tab-content{display:none;padding:20px;max-width:1400px;margin:0 auto}
+.tab-content.active{display:block}
+/* Stats Bar */
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--card);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.05)}
+.stat-card .label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.stat-card .value{font-size:28px;font-weight:700;margin-top:4px}
+.stat-card .sub{font-size:12px;color:var(--text2);margin-top:2px}
+/* District Grid */
+.district-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px}
+.district-card{background:var(--card);border-radius:12px;padding:16px;cursor:pointer;border:1px solid rgba(255,255,255,.05);transition:all .25s}
+.district-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.district-card .d-name{font-size:14px;font-weight:600;margin-bottom:8px}
+.district-card .d-prob{font-size:32px;font-weight:800;line-height:1}
+.district-card .d-weather{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)}
+.district-card .d-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-top:6px}
+.district-card .d-details{display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--text2)}
+.district-card .d-basin{font-size:10px;color:var(--text2);margin-top:6px;font-style:italic}
+/* Risk summary */
+.risk-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.risk-pill{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+/* Prediction Page */
+.pred-header{display:grid;grid-template-columns:300px 1fr;gap:24px;margin-bottom:24px}
+@media(max-width:768px){.pred-header{grid-template-columns:1fr}}
+.prob-circle-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);border-radius:16px;padding:32px;border:1px solid rgba(255,255,255,.05)}
+.prob-circle{position:relative;width:200px;height:200px}
+.prob-circle svg{transform:rotate(-90deg)}
+.prob-circle .circle-bg{fill:none;stroke:#334155;stroke-width:12}
+.prob-circle .circle-fg{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset 1s ease}
+.prob-circle .circle-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.prob-circle .circle-text .pct{font-size:48px;font-weight:800;line-height:1}
+.prob-circle .circle-text .lbl{font-size:12px;color:var(--text2)}
+.pred-info{background:var(--card);border-radius:16px;padding:24px;border:1px solid rgba(255,255,255,.05)}
+.pred-info h3{margin-bottom:12px;font-size:18px}
+.weather-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:16px}
+.weather-item{background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center}
+.weather-item .w-icon{font-size:24px}
+.weather-item .w-val{font-size:22px;font-weight:700;margin:4px 0}
+.weather-item .w-lbl{font-size:11px;color:var(--text2)}
+/* Forecast */
+.forecast-scroll{display:flex;gap:12px;overflow-x:auto;padding:12px 0;scrollbar-width:thin}
+.forecast-card{min-width:130px;background:var(--card);border-radius:12px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,.05);flex-shrink:0}
+.forecast-card .fc-day{font-size:12px;color:var(--text2);margin-bottom:4px}
+.forecast-card .fc-name{font-size:13px;font-weight:600}
+.forecast-card .fc-icon{font-size:28px;margin:8px 0}
+.forecast-card .fc-prob{font-size:24px;font-weight:800}
+.forecast-card .fc-rain{font-size:11px;color:var(--text2);margin-top:4px}
+.chart-container{background:var(--card);border-radius:12px;padding:20px;margin-top:16px;border:1px solid rgba(255,255,255,.05)}
+.chart-container h4{margin-bottom:12px;font-size:15px}
+/* History */
+.history-table{width:100%;border-collapse:collapse;margin-top:12px}
+.history-table th{text-align:left;padding:10px 12px;background:rgba(255,255,255,.03);font-size:12px;color:var(--text2);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.history-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.03);font-size:13px;cursor:pointer}
+.history-table tr:hover td{background:rgba(59,130,246,.05)}
+.event-details{display:none;background:rgba(15,23,42,.5);padding:16px;border-radius:8px;margin:8px 0}
+.event-details.show{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.detail-item{background:rgba(255,255,255,.03);padding:10px;border-radius:8px}
+.detail-item .di-label{font-size:10px;color:var(--text2);text-transform:uppercase}
+.detail-item .di-value{font-size:16px;font-weight:700;margin-top:2px}
+/* Upload */
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:48px;text-align:center;cursor:pointer;transition:all .3s;background:var(--card)}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(59,130,246,.05)}
+.upload-zone i{font-size:48px;color:var(--text2);margin-bottom:12px}
+.upload-zone p{color:var(--text2);font-size:14px}
+.upload-zone .formats{font-size:11px;color:var(--text2);margin-top:8px}
+.analysis-result{margin-top:24px}
+.analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:16px}
+.analysis-card{background:var(--card);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,.05)}
+.analysis-card h4{margin-bottom:12px;font-size:15px;color:var(--accent)}
+.pipeline-steps{list-style:none;padding:0}
+.pipeline-steps li{padding:8px 12px;border-left:2px solid var(--accent);margin-bottom:4px;font-size:13px;color:var(--text2)}
+.pipeline-steps li .step-check{color:var(--low);margin-right:6px}
+/* Model Architecture */
+.arch-flow{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:20px 0;flex-wrap:wrap;justify-content:center}
+.arch-layer{background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:16px 20px;min-width:160px;text-align:center}
+.arch-layer .al-name{font-size:13px;font-weight:700;color:var(--accent)}
+.arch-layer .al-detail{font-size:11px;color:var(--text2);margin-top:4px}
+.arch-layer .al-params{font-size:10px;color:var(--text2);margin-top:2px}
+.arch-arrow{font-size:24px;color:var(--text2)}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:20px}
+.metric-card{background:var(--card);border-radius:10px;padding:16px;text-align:center;border:1px solid rgba(255,255,255,.05)}
+.metric-card .m-val{font-size:28px;font-weight:800;color:var(--accent)}
+.metric-card .m-lbl{font-size:11px;color:var(--text2);margin-top:4px}
+/* About */
+.about-section{background:var(--card);border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid rgba(255,255,255,.05)}
+.about-section h3{color:var(--accent);margin-bottom:12px;font-size:18px}
+.about-section p{color:var(--text2);line-height:1.7;font-size:14px;margin-bottom:10px}
+.about-section ul{padding-left:20px;color:var(--text2);line-height:2}
+.flow-steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:16px 0}
+.flow-step{background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:16px;text-align:center}
+.flow-step .fs-num{width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;margin-bottom:8px}
+.flow-step .fs-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.flow-step .fs-desc{font-size:11px;color:var(--text2)}
+/* Alerts */
+.alert-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.alert-item{background:var(--card);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;border-left:4px solid}
+.alert-item .ai-icon{font-size:24px}
+.alert-item .ai-info{flex:1}
+.alert-item .ai-district{font-weight:600;font-size:15px}
+.alert-item .ai-msg{font-size:12px;color:var(--text2);margin-top:2px}
+.alert-item .ai-prob{font-size:20px;font-weight:800}
+/* SOS */
+.sos-btn{background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border:none;padding:16px 40px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;margin:20px 0;transition:all .2s}
+.sos-btn:hover{transform:scale(1.02);box-shadow:0 8px 30px rgba(220,38,38,.4)}
+.sos-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--card);border-radius:16px;padding:32px;max-width:500px;width:90%;border:1px solid var(--border)}
+.modal-box h3{margin-bottom:16px}
+.modal-box p{color:var(--text2);margin-bottom:20px;font-size:14px}
+.modal-actions{display:flex;gap:12px;justify-content:flex-end}
+.btn{padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.btn-danger{background:var(--severe);color:#fff}
+.btn-secondary{background:var(--border);color:var(--text)}
+.btn:hover{opacity:.9}
+/* Selector */
+.selector-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.selector-row select{background:var(--card);color:var(--text);border:1px solid var(--border);padding:10px 16px;border-radius:8px;font-size:14px;min-width:220px}
+.selector-row select:focus{outline:none;border-color:var(--accent)}
+.section-title{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+/* Map */
+#overview-map{height:350px;border-radius:12px;margin-top:16px;border:1px solid rgba(255,255,255,.05)}
+/* Loading */
+.loader{text-align:center;padding:40px;color:var(--text2)}
+.loader i{font-size:32px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* SOS Log */
+.sos-table{width:100%;border-collapse:collapse;margin-top:12px}
+.sos-table th{text-align:left;padding:8px 12px;background:rgba(255,255,255,.03);font-size:11px;color:var(--text2);text-transform:uppercase}
+.sos-table td{padding:8px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.03)}
+/* Summary cards */
+.summary-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:16px 0}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-title">
+    <i class="fas fa-satellite"></i>
+    <div>
+      <h1>Satellite Preview Karnataka</h1>
+      <span>Flood Prediction & Early Warning System — BiLSTM Deep Learning</span>
+    </div>
+  </div>
+  <div class="header-badge"><i class="fas fa-shield-alt"></i> KA-FloodNet v2.1</div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('dashboard')">🏠 Command Center</button>
+  <button class="tab-btn" onclick="switchTab('prediction')">🤖 AI Prediction</button>
+  <button class="tab-btn" onclick="switchTab('history')">📊 Historical Data</button>
+  <button class="tab-btn" onclick="switchTab('satellite')">🛰️ Satellite Analysis</button>
+  <button class="tab-btn" onclick="switchTab('warning')">⚠️ Early Warning</button>
+  <button class="tab-btn" onclick="switchTab('model')">🧠 Model Architecture</button>
+  <button class="tab-btn" onclick="switchTab('about')">📖 About</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 1: COMMAND CENTER                      -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="stats-bar" id="stats-bar"></div>
+  <div class="risk-summary" id="risk-summary"></div>
+  <div class="section-title"><i class="fas fa-map-marked-alt"></i> Karnataka Flood Risk Map</div>
+  <div id="overview-map"></div>
+  <div class="section-title" style="margin-top:20px"><i class="fas fa-th"></i> All 31 Districts — Live Flood Probability</div>
+  <div class="district-grid" id="district-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 2: AI PREDICTION                       -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-prediction" class="tab-content">
+  <div class="selector-row">
+    <i class="fas fa-map-pin" style="color:var(--accent)"></i>
+    <select id="pred-district-select" onchange="loadPrediction(this.value)">
+      <option value="">— Select a District —</option>
+    </select>
+    <span id="pred-basin" style="color:var(--text2);font-size:13px"></span>
+  </div>
+  <div id="pred-content" style="display:none">
+    <div class="pred-header">
+      <div class="prob-circle-wrap">
+        <div class="prob-circle">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle class="circle-bg" cx="100" cy="100" r="88"/>
+            <circle class="circle-fg" id="prob-fg" cx="100" cy="100" r="88" stroke-dasharray="553" stroke-dashoffset="553"/>
+          </svg>
+          <div class="circle-text">
+            <div class="pct" id="prob-pct">—</div>
+            <div class="lbl">Flood Probability</div>
+          </div>
+        </div>
+        <div id="pred-risk-badge" style="margin-top:16px;font-size:16px;font-weight:700"></div>
+        <div id="pred-action" style="margin-top:6px;font-size:12px;color:var(--text2)"></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text2)">Model Confidence: <span id="pred-confidence">—</span>%</div>
+      </div>
+      <div class="pred-info">
+        <h3 id="pred-weather-title">Weather Conditions</h3>
+        <div class="weather-grid" id="weather-grid"></div>
+      </div>
+    </div>
+    <div class="section-title"><i class="fas fa-calendar-week"></i> 7-Day Flood Forecast</div>
+    <div class="forecast-scroll" id="forecast-scroll"></div>
+    <div class="chart-container">
+      <h4><i class="fas fa-chart-line"></i> Flood Probability Trend (7 Days)</h4>
+      <canvas id="forecast-chart" height="100"></canvas>
+    </div>
+  </div>
+  <div id="pred-placeholder" class="loader" style="padding:80px">
+    <i class="fas fa-cloud-sun-rain" style="font-size:64px;animation:none;color:var(--text2)"></i>
+    <p style="margin-top:16px;font-size:16px">Select a district to view AI flood predictions</p>
+    <p style="font-size:13px;color:var(--text2);margin-top:6px">Powered by BiLSTM-Attention neural network with 72-hour forecasting</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 3: HISTORICAL DATA                     -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-history" class="tab-content">
+  <div class="selector-row">
+    <i class="fas fa-history" style="color:var(--accent)"></i>
+    <select id="hist-district-select" onchange="loadHistory(this.value)">
+      <option value="">— Select a District —</option>
+    </select>
+  </div>
+  <div id="hist-content" style="display:none">
+    <div class="summary-row" id="hist-summary"></div>
+    <div class="chart-container">
+      <h4><i class="fas fa-chart-bar"></i> Year-wise Flood Events (2018–2026)</h4>
+      <canvas id="history-chart" height="100"></canvas>
+    </div>
+    <div class="section-title" style="margin-top:20px"><i class="fas fa-list"></i> Flood Event Timeline — Click any row for details</div>
+    <div style="overflow-x:auto">
+      <table class="history-table">
+        <thead>
+          <tr><th>Date</th><th>Event</th><th>Severity</th><th>Rainfall</th><th>River Level</th><th>Lives Lost</th><th>Affected</th><th>Damage (₹Cr)</th></tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="hist-placeholder" class="loader" style="padding:80px">
+    <i class="fas fa-database" style="font-size:64px;animation:none;color:var(--text2)"></i>
+    <p style="margin-top:16px;font-size:16px">Select a district to explore flood history (2018–2026)</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 4: SATELLITE ANALYSIS                  -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-satellite" class="tab-content">
+  <div class="section-title"><i class="fas fa-satellite-dish"></i> Upload Satellite / QGIS Image for Flood Risk Analysis</div>
+  <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+    <i class="fas fa-cloud-upload-alt"></i>
+    <p>Drag & drop your satellite image here, or click to browse</p>
+    <p class="formats">Supported: .tif, .tiff, .png, .jpg, .jpeg, .geotiff</p>
+    <input type="file" id="file-input" accept=".tif,.tiff,.png,.jpg,.jpeg,.geotiff,.img" style="display:none" onchange="uploadImage(this)">
+  </div>
+  <div id="upload-loader" class="loader" style="display:none"><i class="fas fa-spinner"></i> Analyzing image...</div>
+  <div id="analysis-result" class="analysis-result" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 5: EARLY WARNING                       -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-warning" class="tab-content">
+  <div class="section-title"><i class="fas fa-exclamation-triangle"></i> Active Flood Alerts</div>
+  <div id="alerts-list" class="alert-list"><div class="loader"><i class="fas fa-spinner"></i></div></div>
+  
+  <div class="section-title" style="margin-top:30px"><i class="fas fa-broadcast-tower"></i> Trigger Emergency SOS</div>
+  <div class="selector-row">
+    <select id="sos-district-select"><option value="">— Select District —</option></select>
+    <select id="sos-severity">
+      <option value="Low">Low</option>
+      <option value="Moderate">Moderate</option>
+      <option value="High" selected>High</option>
+      <option value="Severe">Severe</option>
+    </select>
+  </div>
+  <button class="sos-btn" id="sos-trigger-btn" onclick="showSOSModal()">
+    <i class="fas fa-bell"></i> TRIGGER SOS ALERT
+  </button>
+  <div id="sos-status" style="display:none;background:var(--card);border-radius:10px;padding:16px;margin-top:12px"></div>
+
+  <div class="section-title" style="margin-top:30px"><i class="fas fa-history"></i> SOS Alert Log</div>
+  <table class="sos-table">
+    <thead><tr><th>ID</th><th>District</th><th>Severity</th><th>Time</th><th>Status</th></tr></thead>
+    <tbody id="sos-tbody"></tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 6: MODEL ARCHITECTURE                  -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-model" class="tab-content">
+  <div class="section-title"><i class="fas fa-project-diagram"></i> KA-FloodNet v2.1 — BiLSTM-Attention Architecture</div>
+  <div class="arch-flow" id="arch-flow"></div>
+  <div class="section-title" style="margin-top:24px"><i class="fas fa-trophy"></i> Model Performance Metrics</div>
+  <div class="metrics-grid" id="metrics-grid"></div>
+  <div class="section-title" style="margin-top:24px"><i class="fas fa-database"></i> Training Configuration</div>
+  <div class="summary-row" id="training-info"></div>
+  <div class="section-title" style="margin-top:24px"><i class="fas fa-list-ul"></i> Input Features (7 Meteorological Variables)</div>
+  <div id="features-list" style="margin-top:8px"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TAB 7: ABOUT                               -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-about" class="tab-content">
+  <div class="about-section">
+    <h3>🛰️ What is This Project?</h3>
+    <p>The <strong>Satellite Preview Karnataka Project</strong> is a satellite-based flood prediction and early warning system designed for all 31 districts of Karnataka, India. It combines <strong>remote sensing satellite imagery</strong> (Sentinel-1 SAR and Sentinel-2 optical) with <strong>deep learning (BiLSTM-Attention neural networks)</strong> to predict flood probability up to 72 hours in advance.</p>
+    <p>Unlike traditional flood warning systems that rely solely on river gauge readings, this system uses <strong>multi-source data fusion</strong> — integrating satellite imagery, rainfall data from IMD, river gauge telemetry from CWC, soil moisture indices from ISRO Bhuvan, and historical flood patterns — to generate accurate, district-level flood probability forecasts.</p>
+    <p>The system is designed to support <strong>Karnataka State Disaster Management Authority (KSDMA)</strong> and district-level authorities in making timely decisions about evacuations, resource deployment, and public warnings.</p>
+  </div>
+
+  <div class="about-section">
+    <h3>⚙️ How Does It Work?</h3>
+    <p>The system follows a 6-step pipeline from satellite data acquisition to early warning dissemination:</p>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="fs-num">1</div>
+        <div class="fs-title">Satellite Data Capture</div>
+        <div class="fs-desc">Sentinel-1 SAR captures all-weather radar images. Sentinel-2 captures optical multispectral images every 5 days.</div>
+      </div>
+      <div class="flow-step">
+        <div class="fs-num">2</div>
+        <div class="fs-title">Image Processing</div>
+        <div class="fs-desc">SAR backscatter analysis detects water surfaces. NDWI and MNDWI water indices extracted from optical bands.</div>
+      </div>
+      <div class="flow-step">
+        <div class="fs-num">3</div>
+        <div class="fs-title">Ground Sensor Fusion</div>
+        <div class="fs-desc">IMD rainfall, CWC river levels, ISRO soil moisture, and temperature/humidity data collected and merged.</div>
+      </div>
+      <div class="flow-step">
+        <div class="fs-num">4</div>
+        <div class="fs-title">LSTM Deep Learning</div>
+        <div class="fs-desc">30-day sliding window of 7 features fed into BiLSTM-Attention model. Temporal attention highlights critical timesteps.</div>
+      </div>
+      <div class="flow-step">
+        <div class="fs-num">5</div>
+        <div class="fs-title">Flood Prediction</div>
+        <div class="fs-desc">Model outputs flood probability (0-100%) for 6h, 12h, 24h, 48h, and 72h horizons with confidence intervals.</div>
+      </div>
+      <div class="flow-step">
+        <div class="fs-num">6</div>
+        <div class="fs-title">Early Warning</div>
+        <div class="fs-desc">If probability exceeds threshold, automated alerts sent to DDMA, SDRF, and public through SOS broadcast system.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="about-section">
+    <h3>🧠 Why LSTM (Long Short-Term Memory)?</h3>
+    <p>Flood events are inherently <strong>time-series problems</strong>. A flood doesn't happen suddenly — it builds up over days as rainfall accumulates, soil gets saturated, and river levels rise. <strong>LSTM networks</strong> are specifically designed to learn these long-term temporal dependencies.</p>
+    <p>Our <strong>Bidirectional LSTM with Temporal Attention</strong> architecture goes further:</p>
+    <ul>
+      <li><strong>Bidirectional</strong>: Reads the time sequence both forward and backward, capturing patterns that regular LSTMs might miss</li>
+      <li><strong>Temporal Attention</strong>: Automatically learns which past days are most important for predicting floods (e.g., heavy rainfall 3 days ago matters more than light rain yesterday)</li>
+      <li><strong>Multi-horizon</strong>: Produces forecasts at 5 different time horizons (6h to 72h) simultaneously</li>
+    </ul>
+    <p>The model achieves <strong>94.3% AUC-ROC</strong> with only <strong>9.6% false alarm rate</strong>, validated against ISRO/NRSC post-flood satellite imagery.</p>
+  </div>
+
+  <div class="about-section">
+    <h3>🔭 Scope & Future Applications</h3>
+    <ul>
+      <li>Real-time integration with ISRO's MOSDAC and Bhuvan platforms for live satellite feeds</li>
+      <li>Extension to all Indian states using transfer learning from Karnataka model</li>
+      <li>Integration with India's Cell Broadcast Emergency Alert System (C-DOT SACHET)</li>
+      <li>IoT sensor network deployment along major Karnataka rivers</li>
+      <li>Mobile app with GPS-based personalized flood warnings</li>
+      <li>Crop damage prediction using SAR temporal analysis for insurance claims</li>
+      <li>Climate change impact modeling on flood frequency and intensity</li>
+      <li>Integration with Smart City Command Centers (Bengaluru, Mysuru, Hubballi)</li>
+      <li>Automated dam release optimization using reinforcement learning</li>
+      <li>Crowdsourced flood reporting with AI-verified citizen reports</li>
+    </ul>
+  </div>
+
+  <div class="about-section">
+    <h3>🛠️ Technology Stack</h3>
+    <ul>
+      <li><strong>Deep Learning Model:</strong> Bidirectional LSTM with Temporal Attention (276K parameters)</li>
+      <li><strong>Satellite Data:</strong> Sentinel-1 SAR (C-band, 5.4 GHz), Sentinel-2 MSI (13 spectral bands)</li>
+      <li><strong>Ground Data:</strong> IMD (India Meteorological Department), CWC (Central Water Commission), ISRO Bhuvan SMAP</li>
+      <li><strong>Image Processing:</strong> NDWI, MNDWI, AWEI water indices, SAR backscatter change detection</li>
+      <li><strong>Backend:</strong> Python Flask, NumPy, SciPy</li>
+      <li><strong>Frontend:</strong> JavaScript, Leaflet (maps), Chart.js (visualizations)</li>
+      <li><strong>Deployment:</strong> Gunicorn, Render cloud platform</li>
+    </ul>
+  </div>
+</div>
+
+<!-- SOS CONFIRMATION MODAL -->
+<div class="modal-overlay" id="sos-modal">
+  <div class="modal-box">
+    <h3>⚠️ Confirm Emergency SOS Alert</h3>
+    <p>Are you sure you want to send an emergency SOS alert for <strong id="modal-district">this district</strong>?</p>
+    <p style="font-size:12px;color:var(--moderate)"><i class="fas fa-info-circle"></i> This is a TEST/SIMULATION mode. No actual SMS or cell broadcast will be sent.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeSOSModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmSOS()"><i class="fas fa-bell"></i> Confirm SOS</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════
+let overviewMap = null;
+let forecastChart = null;
+let historyChart = null;
+let landcoverChart = null;
+let allDistricts = [];
+
+const KARNATAKA_CENTER = [15.3173, 75.7139];
+
+// ═══════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  // Find matching button
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.textContent.toLowerCase().includes(
+      tabId === 'dashboard' ? 'command' :
+      tabId === 'prediction' ? 'prediction' :
+      tabId === 'history' ? 'historical' :
+      tabId === 'satellite' ? 'satellite' :
+      tabId === 'warning' ? 'warning' :
+      tabId === 'model' ? 'model' :
+      tabId === 'about' ? 'about' : ''
+    )) b.classList.add('active');
+  });
+  // Init map if needed
+  if (tabId === 'dashboard' && overviewMap) {
+    setTimeout(() => overviewMap.invalidateSize(), 100);
+  }
+  if (tabId === 'warning') loadAlerts();
+  if (tabId === 'model') loadModelInfo();
+}
+
+// ═══════════════════════════════════════════
+// COMMAND CENTER
+// ═══════════════════════════════════════════
+function loadOverview() {
+  fetch('/api/overview').then(r => r.json()).then(data => {
+    if (data.status !== 'success') return;
+    const s = data.statewide_summary;
+    allDistricts = data.districts;
+
+    // Stats bar
+    document.getElementById('stats-bar').innerHTML = `
+      <div class="stat-card"><div class="label">Districts Monitored</div><div class="value">${data.total_districts}</div><div class="sub">All Karnataka</div></div>
+      <div class="stat-card"><div class="label">Active Alerts</div><div class="value" style="color:var(--severe)">${s.severe_count + s.high_count}</div><div class="sub">${s.severe_count} Severe, ${s.high_count} High</div></div>
+      <div class="stat-card"><div class="label">Avg Flood Risk</div><div class="value" style="color:${s.average_flood_probability > 50 ? 'var(--high)' : 'var(--accent)'}">${s.average_flood_probability}%</div><div class="sub">Statewide average</div></div>
+      <div class="stat-card"><div class="label">Highest Risk</div><div class="value" style="color:var(--severe);font-size:18px">${s.highest_risk_district}</div><div class="sub">${s.highest_risk_pct}% flood probability</div></div>
+      <div class="stat-card"><div class="label">Avg Rainfall</div><div class="value">${s.average_rainfall_mm}</div><div class="sub">mm today</div></div>
+      <div class="stat-card"><div class="label">SOS Alerts</div><div class="value">${s.total_sos_alerts}</div><div class="sub">Triggered</div></div>
+    `;
+
+    // Risk summary
+    document.getElementById('risk-summary').innerHTML = `
+      <div class="risk-pill" style="background:rgba(220,38,38,.15);color:var(--severe)">🔴 Severe: ${s.severe_count}</div>
+      <div class="risk-pill" style="background:rgba(234,88,12,.15);color:var(--high)">🟠 High: ${s.high_count}</div>
+      <div class="risk-pill" style="background:rgba(234,179,8,.15);color:var(--moderate)">🟡 Moderate: ${s.moderate_count}</div>
+      <div class="risk-pill" style="background:rgba(34,197,94,.15);color:var(--low)">🟢 Low/Minimal: ${s.low_count}</div>
+    `;
+
+    // District grid
+    let gridHtml = '';
+    data.districts.forEach(d => {
+      gridHtml += `
+        <div class="district-card" onclick="goToPrediction('${d.district}')" style="border-left:3px solid ${d.risk_color}">
+          <div class="d-name">${d.district}</div>
+          <div class="d-prob" style="color:${d.risk_color}">${d.flood_probability_pct}%</div>
+          <div class="d-weather">${d.weather_icon} ${d.weather_description} · ${d.weather.temperature_c}°C</div>
+          <div class="d-badge" style="background:${d.risk_color}20;color:${d.risk_color}">${d.risk_icon} ${d.risk_level}</div>
+          <div class="d-details">
+            <span>🌧️ ${d.weather.rainfall_mm}mm</span>
+            <span>💧 ${d.weather.humidity_pct}%</span>
+            <span>🌊 ${d.weather.river_level_pct}%</span>
+          </div>
+          <div class="d-basin">${d.river_basin}</div>
+        </div>`;
+    });
+    document.getElementById('district-grid').innerHTML = gridHtml;
+
+    // Populate dropdowns
+    populateDropdowns(data.districts);
+
+    // Map
+    initOverviewMap(data.districts);
+  });
+}
+
+function populateDropdowns(districts) {
+  const names = districts.map(d => d.district).sort();
+  ['pred-district-select', 'hist-district-select', 'sos-district-select'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select a District —</option>';
+    names.forEach(n => {
+      sel.innerHTML += `<option value="${n}">${n}</option>`;
+    });
+    if (current) sel.value = current;
+  });
+}
+
+function goToPrediction(district) {
+  document.getElementById('pred-district-select').value = district;
+  switchTab('prediction');
+  loadPrediction(district);
+}
+
+// ═══════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════
+function initOverviewMap(districts) {
+  if (overviewMap) { overviewMap.remove(); overviewMap = null; }
+  overviewMap = L.map('overview-map', { zoomControl: true }).setView(KARNATAKA_CENTER, 7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© CartoDB © OSM', maxZoom: 18
+  }).addTo(overviewMap);
+
+  districts.forEach(d => {
+    if (!d.weather) return;
+    // Approximate district positions using a hash
+    const lat = 12 + (hashStr(d.district) % 500) / 100;
+    const lng = 74 + (hashStr(d.district + 'x') % 400) / 100;
+    const color = d.risk_color;
+    const marker = L.circleMarker([lat, lng], {
+      radius: 8 + d.flood_probability_pct / 15,
+      fillColor: color, color: color, fillOpacity: 0.7, weight: 1
+    }).addTo(overviewMap);
+    marker.bindPopup(`<b>${d.district}</b><br>Flood Risk: ${d.flood_probability_pct}%<br>Level: ${d.risk_level}<br>Rainfall: ${d.weather.rainfall_mm}mm`);
+  });
+}
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// ═══════════════════════════════════════════
+// AI PREDICTION
+// ═══════════════════════════════════════════
+function loadPrediction(district) {
+  if (!district) {
+    document.getElementById('pred-content').style.display = 'none';
+    document.getElementById('pred-placeholder').style.display = 'block';
+    return;
+  }
+  document.getElementById('pred-placeholder').style.display = 'none';
+  document.getElementById('pred-content').style.display = 'block';
+
+  fetch(`/api/district/${encodeURIComponent(district)}`).then(r => r.json()).then(data => {
+    if (data.status !== 'success') return;
+    const c = data.current;
+    const f = data.forecast_7day;
+
+    // Basin
+    document.getElementById('pred-basin').textContent = `River Basin: ${c.river_basin} | Rank: #${c.flood_prone_rank} most flood-prone`;
+
+    // Probability circle
+    const pct = c.flood_probability_pct;
+    const circumference = 2 * Math.PI * 88;
+    const offset = circumference - (pct / 100) * circumference;
+    const fg = document.getElementById('prob-fg');
+    fg.style.stroke = c.risk_color;
+    fg.setAttribute('stroke-dasharray', circumference);
+    fg.setAttribute('stroke-dashoffset', circumference);
+    setTimeout(() => { fg.setAttribute('stroke-dashoffset', offset); }, 50);
+
+    document.getElementById('prob-pct').textContent = pct + '%';
+    document.getElementById('prob-pct').style.color = c.risk_color;
+    document.getElementById('pred-risk-badge').innerHTML = `${c.risk_icon} ${c.risk_level}`;
+    document.getElementById('pred-risk-badge').style.color = c.risk_color;
+    document.getElementById('pred-action').textContent = c.risk_action;
+    document.getElementById('pred-confidence').textContent = c.model_confidence;
+
+    // Weather title
+    document.getElementById('pred-weather-title').innerHTML = `${c.weather_icon} ${c.weather_description} — ${c.district}`;
+
+    // Weather grid
+    const w = c.weather;
+    document.getElementById('weather-grid').innerHTML = `
+      <div class="weather-item"><div class="w-icon">🌧️</div><div class="w-val">${w.rainfall_mm}</div><div class="w-lbl">Rainfall (mm)</div></div>
+      <div class="weather-item"><div class="w-icon">🌡️</div><div class="w-val">${w.temperature_c}°</div><div class="w-lbl">Temperature (°C)</div></div>
+      <div class="weather-item"><div class="w-icon">💧</div><div class="w-val">${w.humidity_pct}%</div><div class="w-lbl">Humidity</div></div>
+      <div class="weather-item"><div class="w-icon">💨</div><div class="w-val">${w.wind_speed_kmh}</div><div class="w-lbl">Wind (km/h)</div></div>
+      <div class="weather-item"><div class="w-icon">☁️</div><div class="w-val">${w.cloud_cover_pct}%</div><div class="w-lbl">Cloud Cover</div></div>
+      <div class="weather-item"><div class="w-icon">🌊</div><div class="w-val">${w.river_level_pct}%</div><div class="w-lbl">River Level</div></div>
+    `;
+
+    // Forecast cards
+    let fcHtml = '';
+    f.forEach(day => {
+      fcHtml += `
+        <div class="forecast-card" style="border-top:3px solid ${day.risk_color}">
+          <div class="fc-day">${day.day_label}</div>
+          <div class="fc-name">${day.day_name}</div>
+          <div class="fc-icon">${day.weather_icon}</div>
+          <div class="fc-prob" style="color:${day.risk_color}">${day.flood_probability_pct}%</div>
+          <div class="d-badge" style="background:${day.risk_color}20;color:${day.risk_color};font-size:10px">${day.risk_level}</div>
+          <div class="fc-rain">🌧️ ${day.weather.rainfall_mm}mm</div>
+        </div>`;
+    });
+    document.getElementById('forecast-scroll').innerHTML = fcHtml;
+
+    // Forecast chart
+    if (forecastChart) forecastChart.destroy();
+    const ctx = document.getElementById('forecast-chart').getContext('2d');
+    forecastChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: f.map(d => d.day_label),
+        datasets: [
+          {
+            label: 'Flood Probability (%)',
+            data: f.map(d => d.flood_probability_pct),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointBackgroundColor: f.map(d => d.risk_color)
+          },
+          {
+            label: 'Upper Bound',
+            data: f.map(d => d.confidence_interval.upper),
+            borderColor: 'rgba(59,130,246,0.3)',
+            borderDash: [5, 5],
+            fill: false,
+            pointRadius: 0
+          },
+          {
+            label: 'Lower Bound',
+            data: f.map(d => d.confidence_interval.lower),
+            borderColor: 'rgba(59,130,246,0.3)',
+            borderDash: [5, 5],
+            fill: '-1',
+            backgroundColor: 'rgba(59,130,246,0.05)',
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#94a3b8' } } },
+        scales: {
+          y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+        }
+      }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════
+// HISTORICAL DATA
+// ═══════════════════════════════════════════
+function loadHistory(district) {
+  if (!district) {
+    document.getElementById('hist-content').style.display = 'none';
+    document.getElementById('hist-placeholder').style.display = 'block';
+    return;
+  }
+  document.getElementById('hist-placeholder').style.display = 'none';
+  document.getElementById('hist-content').style.display = 'block';
+
+  fetch(`/api/district/${encodeURIComponent(district)}/history`).then(r => r.json()).then(data => {
+    if (data.status !== 'success') return;
+    const s = data.summary;
+
+    // Summary
+    document.getElementById('hist-summary').innerHTML = `
+      <div class="stat-card"><div class="label">Total Events</div><div class="value">${s.total_events}</div></div>
+      <div class="stat-card"><div class="label">Severe Events</div><div class="value" style="color:var(--severe)">${s.severe_events}</div></div>
+      <div class="stat-card"><div class="label">Lives Lost</div><div class="value" style="color:var(--high)">${s.total_lives_lost}</div></div>
+      <div class="stat-card"><div class="label">People Affected</div><div class="value">${(s.total_people_affected/1e6).toFixed(1)}M</div></div>
+      <div class="stat-card"><div class="label">Damage</div><div class="value">₹${s.total_infrastructure_damage_crores}Cr</div></div>
+      <div class="stat-card"><div class="label">Worst Year</div><div class="value" style="color:var(--accent)">${s.most_affected_year}</div></div>
+    `;
+
+    // Year chart
+    const years = Object.keys(data.year_summary).sort();
+    const sevColors = { Severe: '#dc2626', High: '#ea580c', Moderate: '#eab308', Low: '#22c55e' };
+    if (historyChart) historyChart.destroy();
+    const ctx = document.getElementById('history-chart').getContext('2d');
+    historyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: years,
+        datasets: [{
+          label: 'Flood Events',
+          data: years.map(y => data.year_summary[y].events),
+          backgroundColor: years.map(y => sevColors[data.year_summary[y].max_severity] || '#3b82f6'),
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#94a3b8' } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+        },
+        onClick: (e, elements) => {
+          if (elements.length > 0) {
+            const year = years[elements[0].index];
+            // Scroll to and highlight events from that year
+            const rows = document.querySelectorAll('.hist-row');
+            rows.forEach(r => {
+              if (r.dataset.year === year) {
+                r.style.background = 'rgba(59,130,246,0.15)';
+                r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else {
+                r.style.background = '';
+              }
+            });
+          }
+        }
+      }
+    });
+
+    // Events table
+    let tbHtml = '';
+    data.events.forEach((ev, idx) => {
+      const sevStyle = `color:${sevColors[ev.severity] || '#94a3b8'}`;
+      tbHtml += `
+        <tr class="hist-row" data-year="${ev.year}" onclick="toggleEventDetail(${idx})">
+          <td>${ev.date}</td>
+          <td>${ev.event_type}</td>
+          <td style="${sevStyle};font-weight:700">${ev.severity}</td>
+          <td>${ev.rainfall_mm} mm</td>
+          <td>${ev.max_river_level_m} m</td>
+          <td>${ev.damages.lives_lost}</td>
+          <td>${(ev.damages.people_affected/1000).toFixed(0)}K</td>
+          <td>₹${ev.damages.infrastructure_damage_crores}Cr</td>
+        </tr>
+        <tr><td colspan="8" style="padding:0">
+          <div class="event-details" id="ev-detail-${idx}">
+            <div class="detail-grid">
+              <div class="detail-item"><div class="di-label">Duration</div><div class="di-value">${ev.duration_days} days</div></div>
+              <div class="detail-item"><div class="di-label">Houses Damaged</div><div class="di-value">${ev.damages.houses_damaged.toLocaleString()}</div></div>
+              <div class="detail-item"><div class="di-label">Crop Loss</div><div class="di-value">${ev.damages.crop_loss_hectares.toLocaleString()} ha</div></div>
+              <div class="detail-item"><div class="di-label">Livestock Lost</div><div class="di-value">${ev.damages.livestock_lost}</div></div>
+              <div class="detail-item"><div class="di-label">Roads Damaged</div><div class="di-value">${ev.damages.roads_damaged_km} km</div></div>
+              <div class="detail-item"><div class="di-label">Bridges Affected</div><div class="di-value">${ev.damages.bridges_affected}</div></div>
+              <div class="detail-item"><div class="di-label">NDRF Teams</div><div class="di-value">${ev.response.ndrf_teams_deployed}</div></div>
+              <div class="detail-item"><div class="di-label">SDRF Teams</div><div class="di-value">${ev.response.sdrf_teams_deployed}</div></div>
+              <div class="detail-item"><div class="di-label">Evacuated</div><div class="di-value">${(ev.response.people_evacuated/1000).toFixed(0)}K</div></div>
+              <div class="detail-item"><div class="di-label">Relief Camps</div><div class="di-value">${ev.response.relief_camps_opened}</div></div>
+              <div class="detail-item"><div class="di-label">Relief Funds</div><div class="di-value">₹${ev.response.relief_amount_cr}Cr</div></div>
+              <div class="detail-item"><div class="di-label">Satellite Pass</div><div class="di-value" style="font-size:11px">${ev.satellite_observation.sentinel1_pass}</div></div>
+              <div class="detail-item"><div class="di-label">Flood Extent</div><div class="di-value">${ev.satellite_observation.flood_extent_sqkm} km²</div></div>
+            </div>
+          </div>
+        </td></tr>`;
+    });
+    document.getElementById('hist-tbody').innerHTML = tbHtml;
+  });
+}
+
+function toggleEventDetail(idx) {
+  const el = document.getElementById('ev-detail-' + idx);
+  if (el) el.classList.toggle('show');
+}
+
+// ═══════════════════════════════════════════
+// SATELLITE ANALYSIS
+// ═══════════════════════════════════════════
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) { document.getElementById('file-input').files = e.dataTransfer.files; uploadImage(document.getElementById('file-input')); }
+});
+
+function uploadImage(input) {
+  if (!input.files || !input.files[0]) return;
+  const formData = new FormData();
+  formData.append('image', input.files[0]);
+
+  document.getElementById('upload-loader').style.display = 'block';
+  document.getElementById('analysis-result').style.display = 'none';
+
+  fetch('/api/satellite/analyze', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('upload-loader').style.display = 'none';
+      if (data.status !== 'success') { alert(data.message); return; }
+      const a = data.analysis;
+      const fr = a.flood_risk_assessment;
+      const lc = a.land_cover_classification;
+      const sp = a.spectral_indices;
+      const sar = a.sar_backscatter;
+
+      let riskColor = fr.risk_level === 'Severe' ? 'var(--severe)' : fr.risk_level === 'High' ? 'var(--high)' : fr.risk_level === 'Moderate' ? 'var(--moderate)' : 'var(--low)';
+
+      let html = `
+        <div class="analysis-grid">
+          <div class="analysis-card">
+            <h4><i class="fas fa-exclamation-circle"></i> Flood Risk Assessment</h4>
+            <div style="text-align:center;padding:20px">
+              <div style="font-size:56px;font-weight:800;color:${riskColor}">${fr.flood_risk_pct}%</div>
+              <div style="font-size:18px;font-weight:700;color:${riskColor};margin-top:4px">${fr.risk_level} Risk</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:8px">${fr.interpretation}</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:4px">Water extent change: ${fr.water_extent_change}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">Confidence: ${fr.confidence}%</div>
+            </div>
+          </div>
+          <div class="analysis-card">
+            <h4><i class="fas fa-globe"></i> Land Cover Classification</h4>
+            <canvas id="landcover-chart" height="200"></canvas>
+          </div>
+          <div class="analysis-card">
+            <h4><i class="fas fa-wave-square"></i> Spectral Water Indices</h4>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+              <div class="detail-item"><div class="di-label">NDWI</div><div class="di-value">${sp.ndwi_mean}</div></div>
+              <div class="detail-item"><div class="di-label">MNDWI</div><div class="di-value">${sp.mndwi_mean}</div></div>
+              <div class="detail-item"><div class="di-label">AWEI (shadow)</div><div class="di-value">${sp.awei_shadow}</div></div>
+              <div class="detail-item"><div class="di-label">AWEI (no shadow)</div><div class="di-value">${sp.awei_no_shadow}</div></div>
+            </div>
+            <p style="font-size:11px;color:var(--text2);margin-top:10px">${sp.ndwi_interpretation}</p>
+          </div>
+          <div class="analysis-card">
+            <h4><i class="fas fa-satellite-dish"></i> SAR Backscatter Analysis</h4>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+              <div class="detail-item"><div class="di-label">VV Polarization</div><div class="di-value">${sar.vv_polarization_db} dB</div></div>
+              <div class="detail-item"><div class="di-label">VH Polarization</div><div class="di-value">${sar.vh_polarization_db} dB</div></div>
+              <div class="detail-item"><div class="di-label">Backscatter Change</div><div class="di-value" style="color:${sar.backscatter_change_db < sar.flood_detection_threshold_db ? 'var(--severe)' : 'var(--low)'}">${sar.backscatter_change_db} dB</div></div>
+              <div class="detail-item"><div class="di-label">Flood Threshold</div><div class="di-value">${sar.flood_detection_threshold_db} dB</div></div>
+            </div>
+            <p style="font-size:11px;color:var(--text2);margin-top:10px">Pixels below threshold: ${sar.pixels_below_threshold_pct}%</p>
+          </div>
+          <div class="analysis-card" style="grid-column:1/-1">
+            <h4><i class="fas fa-cogs"></i> Processing Pipeline</h4>
+            <ul class="pipeline-steps">
+              ${a.processing_pipeline.map(s => `<li><span class="step-check">✓</span>${s}</li>`).join('')}
+            </ul>
+            <p style="font-size:11px;color:var(--text2);margin-top:10px">File: ${a.filename} (${a.file_size_kb} KB) — Analyzed at ${a.analysis_timestamp}</p>
+          </div>
+        </div>`;
+
+      document.getElementById('analysis-result').innerHTML = html;
+      document.getElementById('analysis-result').style.display = 'block';
+
+      // Land cover chart
+      setTimeout(() => {
+        if (landcoverChart) landcoverChart.destroy();
+        const ctx2 = document.getElementById('landcover-chart');
+        if (ctx2) {
+          landcoverChart = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+              labels: ['Water', 'Vegetation', 'Urban', 'Bare Soil'],
+              datasets: [{
+                data: [lc.water_pct, lc.vegetation_pct, lc.urban_pct, lc.bare_soil_pct],
+                backgroundColor: ['#3b82f6', '#22c55e', '#a855f7', '#eab308']
+              }]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+          });
+        }
+      }, 100);
+    })
+    .catch(err => {
+      document.getElementById('upload-loader').style.display = 'none';
+      alert('Upload failed: ' + err.message);
+    });
+}
+
+// ═══════════════════════════════════════════
+// EARLY WARNING
+// ═══════════════════════════════════════════
+function loadAlerts() {
+  fetch('/api/alerts/active').then(r => r.json()).then(data => {
+    if (data.active_alerts === 0) {
+      document.getElementById('alerts-list').innerHTML = '<p style="color:var(--text2);padding:20px">No active alerts at this time.</p>';
+      return;
+    }
+    let html = '';
+    data.alerts.forEach(a => {
+      html += `
+        <div class="alert-item" style="border-color:${a.risk_color}">
+          <div class="ai-icon" style="color:${a.risk_color}">⚠️</div>
+          <div class="ai-info">
+            <div class="ai-district">${a.district}</div>
+            <div class="ai-msg">${a.message}</div>
+          </div>
+          <div class="ai-prob" style="color:${a.risk_color}">${a.flood_probability_pct}%</div>
+        </div>`;
+    });
+    document.getElementById('alerts-list').innerHTML = html;
+  });
+
+  // Load SOS log
+  fetch('/api/sos/log').then(r => r.json()).then(data => {
+    let html = '';
+    data.log.forEach(s => {
+      html += `<tr><td>${s.sos_id}</td><td>${s.district}</td><td>${s.severity}</td><td>${s.timestamp}</td><td style="color:var(--moderate)">${s.status}</td></tr>`;
+    });
+    document.getElementById('sos-tbody').innerHTML = html || '<tr><td colspan="5" style="color:var(--text2)">No SOS alerts triggered yet</td></tr>';
+  });
+}
+
+function showSOSModal() {
+  const dist = document.getElementById('sos-district-select').value;
+  if (!dist) { alert('Please select a district first'); return; }
+  document.getElementById('modal-district').textContent = dist;
+  document.getElementById('sos-modal').classList.add('show');
+}
+
+function closeSOSModal() {
+  document.getElementById('sos-modal').classList.remove('show');
+}
+
+function confirmSOS() {
+  const dist = document.getElementById('sos-district-select').value;
+  const sev = document.getElementById('sos-severity').value;
+  closeSOSModal();
+
+  const btn = document.getElementById('sos-trigger-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+  fetch('/api/sos/trigger', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ district: dist, severity: sev, confirmed: true })
+  }).then(r => r.json()).then(data => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-bell"></i> TRIGGER SOS ALERT';
+    const statusEl = document.getElementById('sos-status');
+    if (data.status === 'success') {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<div style="color:var(--low);font-weight:700;margin-bottom:8px">✅ SOS Alert Triggered (Simulation)</div>
+        <div style="font-size:13px;color:var(--text2)">ID: ${data.sos.sos_id}<br>District: ${data.sos.district}<br>Mode: ${data.sos.mode}</div>
+        <pre style="background:rgba(0,0,0,.3);padding:12px;border-radius:8px;margin-top:10px;font-size:11px;white-space:pre-wrap;color:var(--text2)">${data.sos.message}</pre>`;
+    } else {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<div style="color:var(--severe)">❌ ${data.message}</div>`;
+    }
+    loadAlerts();
+  });
+}
+
+// ═══════════════════════════════════════════
+// MODEL INFO
+// ═══════════════════════════════════════════
+function loadModelInfo() {
+  fetch('/api/model/info').then(r => r.json()).then(data => {
+    const m = data.model;
+    const arch = m.architecture;
+
+    // Architecture flow
+    let flowHtml = '';
+    arch.layers.forEach((l, i) => {
+      if (i > 0) flowHtml += '<div class="arch-arrow">→</div>';
+      flowHtml += `
+        <div class="arch-layer">
+          <div class="al-name">${l.name}</div>
+          <div class="al-detail">${l.units ? 'Units: ' + l.units : l.shape || ''}</div>
+          <div class="al-params">${l.params.toLocaleString()} params</div>
+        </div>`;
+    });
+    flowHtml += `<div style="margin-top:12px;text-align:center;width:100%;font-size:13px;color:var(--text2)">Total: ${arch.total_parameters.toLocaleString()} trainable parameters</div>`;
+    document.getElementById('arch-flow').innerHTML = flowHtml;
+
+    // Metrics
+    const met = m.metrics;
+    document.getElementById('metrics-grid').innerHTML = `
+      <div class="metric-card"><div class="m-val">${met.test_auc_roc}</div><div class="m-lbl">AUC-ROC</div></div>
+      <div class="metric-card"><div class="m-val">${met.test_f1_score}</div><div class="m-lbl">F1 Score</div></div>
+      <div class="metric-card"><div class="m-val">${met.test_precision}</div><div class="m-lbl">Precision</div></div>
+      <div class="metric-card"><div class="m-val">${met.test_recall}</div><div class="m-lbl">Recall</div></div>
+      <div class="metric-card"><div class="m-val">${met.test_mae}</div><div class="m-lbl">MAE</div></div>
+      <div class="metric-card"><div class="m-val">${met.test_rmse}</div><div class="m-lbl">RMSE</div></div>
+      <div class="metric-card"><div class="m-val">${(met.false_alarm_rate * 100).toFixed(1)}%</div><div class="m-lbl">False Alarm Rate</div></div>
+    `;
+
+    // Training
+    const tr = m.training;
+    document.getElementById('training-info').innerHTML = `
+      <div class="stat-card"><div class="label">Dataset</div><div class="value" style="font-size:14px">${tr.dataset}</div></div>
+      <div class="stat-card"><div class="label">Samples</div><div class="value">${tr.total_samples.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="label">Epochs</div><div class="value">${tr.epochs_trained}</div><div class="sub">Best: ${tr.best_epoch}</div></div>
+      <div class="stat-card"><div class="label">Batch Size</div><div class="value">${tr.batch_size}</div></div>
+      <div class="stat-card"><div class="label">Optimizer</div><div class="value" style="font-size:13px">${arch.optimizer}</div></div>
+      <div class="stat-card"><div class="label">Loss Function</div><div class="value" style="font-size:11px">${arch.loss_function}</div></div>
+    `;
+
+    // Features
+    let featHtml = '';
+    arch.input_features.forEach((f, i) => {
+      featHtml += `<div style="background:var(--card);padding:10px 16px;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--accent);font-size:13px"><strong>${i+1}.</strong> ${f}</div>`;
+    });
+    document.getElementById('features-list').innerHTML = featHtml;
+  });
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadOverview();
+});
+</script>
+</body>
+</html>
