@@ -146,7 +146,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .selector-row select:focus{outline:none;border-color:var(--accent)}
 .section-title{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 /* Map */
-#overview-map{height:350px;border-radius:12px;margin-top:16px;border:1px solid rgba(255,255,255,.05)}
+#overview-map{height:500px;border-radius:12px;margin-top:16px;border:1px solid rgba(255,255,255,.05)}
 /* Loading */
 .loader{text-align:center;padding:40px;color:var(--text2)}
 .loader i{font-size:32px;animation:spin 1s linear infinite}
@@ -553,26 +553,119 @@ function goToPrediction(district) {
 }
 
 // ═══════════════════════════════════════════
-// MAP
+// MAP — GeoJSON District Boundaries
 // ═══════════════════════════════════════════
 function initOverviewMap(districts) {
   if (overviewMap) { overviewMap.remove(); overviewMap = null; }
   overviewMap = L.map('overview-map', { zoomControl: true }).setView(KARNATAKA_CENTER, 7);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© CartoDB © OSM', maxZoom: 18
+    attribution: '&copy; CartoDB &copy; OSM', maxZoom: 18
   }).addTo(overviewMap);
 
+  // Build a lookup: district NAME_2 → risk data
+  const riskLookup = {};
   districts.forEach(d => {
-    if (!d.weather) return;
-    // Approximate district positions using a hash
-    const lat = 12 + (hashStr(d.district) % 500) / 100;
-    const lng = 74 + (hashStr(d.district + 'x') % 400) / 100;
-    const color = d.risk_color;
-    const marker = L.circleMarker([lat, lng], {
-      radius: 8 + d.flood_probability_pct / 15,
-      fillColor: color, color: color, fillOpacity: 0.7, weight: 1
+    riskLookup[d.district.toLowerCase()] = d;
+    // Also map common old names
+    const aliases = {
+      'belagavi':'bagalkot','bengaluru urban':'bangalore urban','bengaluru rural':'bangalore rural',
+      'ballari':'bellary','vijayapura':'bijapur','kalaburagi':'gulbarga',
+      'mysuru':'mysore','shivamogga':'shimoga','tumakuru':'tumkur',
+      'chamarajanagar':'chamrajnagar','dakshina kannada':'dakshin kannad',
+      'uttara kannada':'uttar kannand','chikkamagaluru':'chikmagalur'
+    };
+    // Reverse alias too
+    for (const [newN, oldN] of Object.entries(aliases)) {
+      if (d.district.toLowerCase() === newN) riskLookup[oldN] = d;
+      if (d.district.toLowerCase() === oldN) riskLookup[newN] = d;
+    }
+  });
+
+  // Fetch GeoJSON and render district polygons
+  fetch('/api/geojson').then(r => r.json()).then(geojson => {
+    if (!geojson.features || geojson.features.length === 0) {
+      // Fallback to circle markers if no GeoJSON
+      districts.forEach(d => {
+        if (!d.weather) return;
+        const lat = 12 + (hashStr(d.district) % 500) / 100;
+        const lng = 74 + (hashStr(d.district + 'x') % 400) / 100;
+        L.circleMarker([lat, lng], {
+          radius: 8 + d.flood_probability_pct / 15,
+          fillColor: d.risk_color, color: d.risk_color, fillOpacity: 0.7, weight: 1
+        }).addTo(overviewMap).bindPopup(`<b>${d.district}</b><br>Flood Risk: ${d.flood_probability_pct}%`);
+      });
+      return;
+    }
+
+    L.geoJSON(geojson, {
+      style: function(feature) {
+        const name = (feature.properties.NAME_2 || '').toLowerCase();
+        const d = riskLookup[name];
+        const color = d ? d.risk_color : '#475569';
+        const opacity = d ? 0.55 : 0.15;
+        return {
+          fillColor: color,
+          color: '#94a3b8',
+          weight: 1.5,
+          fillOpacity: opacity,
+          opacity: 0.7
+        };
+      },
+      onEachFeature: function(feature, layer) {
+        const name = (feature.properties.NAME_2 || '').toLowerCase();
+        const d = riskLookup[name];
+        if (d) {
+          layer.bindPopup(`
+            <div style="font-family:system-ui;min-width:180px">
+              <div style="font-size:15px;font-weight:700;margin-bottom:6px">${d.district}</div>
+              <div style="font-size:28px;font-weight:800;color:${d.risk_color}">${d.flood_probability_pct}%</div>
+              <div style="font-size:12px;color:#666;margin:4px 0">Flood Probability</div>
+              <div style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${d.risk_color}22;color:${d.risk_color}">${d.risk_icon} ${d.risk_level}</div>
+              <div style="margin-top:8px;font-size:12px;color:#555">
+                🌧️ ${d.weather.rainfall_mm}mm &nbsp; 🌡️ ${d.weather.temperature_c}°C<br>
+                💧 ${d.weather.humidity_pct}% &nbsp; 🌊 River: ${d.weather.river_level_pct}%
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:#888;font-style:italic">${d.river_basin}</div>
+            </div>
+          `);
+          layer.bindTooltip(`${d.district}: ${d.flood_probability_pct}%`, {
+            permanent: false, direction: 'center',
+            className: 'district-tooltip'
+          });
+          layer.on('mouseover', function() {
+            this.setStyle({ weight: 3, color: '#fff', fillOpacity: 0.75 });
+            this.bringToFront();
+          });
+          layer.on('mouseout', function() {
+            this.setStyle({ weight: 1.5, color: '#94a3b8', fillOpacity: d ? 0.55 : 0.15 });
+          });
+          layer.on('click', function() {
+            goToPrediction(d.district);
+          });
+        } else {
+          layer.bindTooltip(feature.properties.NAME_2 || 'Unknown', {
+            permanent: false, direction: 'center'
+          });
+        }
+      }
     }).addTo(overviewMap);
-    marker.bindPopup(`<b>${d.district}</b><br>Flood Risk: ${d.flood_probability_pct}%<br>Level: ${d.risk_level}<br>Rainfall: ${d.weather.rainfall_mm}mm`);
+
+    // Add a legend
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div', 'map-legend');
+      div.style.cssText = 'background:rgba(15,23,42,0.9);padding:10px 14px;border-radius:8px;color:#f1f5f9;font-size:11px;line-height:1.8;border:1px solid #475569';
+      div.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px">Flood Risk Level</div>
+        <div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#dc2626;margin-right:6px"></span>Severe (≥75%)</div>
+        <div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ea580c;margin-right:6px"></span>High (55-74%)</div>
+        <div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#eab308;margin-right:6px"></span>Moderate (35-54%)</div>
+        <div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#22c55e;margin-right:6px"></span>Low (15-34%)</div>
+        <div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#3b82f6;margin-right:6px"></span>Minimal (&lt;15%)</div>
+      `;
+      return div;
+    };
+    legend.addTo(overviewMap);
   });
 }
 

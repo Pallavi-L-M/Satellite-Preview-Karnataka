@@ -33,6 +33,15 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ── Load GeoJSON ──
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'static', 'data')
+GEOJSON_PATH = os.path.join(DATA_DIR, 'karnataka_districts.geojson')
+if os.path.exists(GEOJSON_PATH):
+    with open(GEOJSON_PATH, 'r', encoding='utf-8') as f:
+        KARNATAKA_GEOJSON = json.load(f)
+else:
+    KARNATAKA_GEOJSON = None
+
 # ── Alert logs ──
 alert_log = []
 sos_log = []
@@ -47,6 +56,14 @@ SOS_COOLDOWN = 60
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api/geojson')
+def api_geojson():
+    """Return Karnataka district boundaries GeoJSON."""
+    if KARNATAKA_GEOJSON:
+        return jsonify(KARNATAKA_GEOJSON)
+    return jsonify({"type": "FeatureCollection", "features": []})
 
 
 # ══════════════════════════════════════════════════════════════
